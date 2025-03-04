@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { handle } from 'hono/cloudflare-workers';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'crypto';
 
 const app = new Hono();
 

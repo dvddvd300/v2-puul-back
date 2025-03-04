@@ -6,10 +6,16 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "my-hono-app",
 	"main": "src/index.ts",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
 	"compatibility_date": "2025-03-03",
 	"observability": {
 		"enabled": true
-	}
+  },
+  "kv_namespaces": [
+    { "binding": "MY_KV_NAMESPACE", "id": "my-kv-namespace" }
+  ]
   /**
    * Smart Placement
    * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
