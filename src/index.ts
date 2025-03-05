@@ -18,10 +18,11 @@ app.post('/register', async (c) => {
   const { name, password, email, role } = await c.req.json();
   const salt = randomBytes(16).toString('hex');
   const hashedPassword = hashPassword(password, salt);
+  const password_hash = '${hashedPassword}:${salt}';
 
   await c.env.PUULDB.prepare(
-    'INSERT INTO users (name, email, password, salt, role) VALUES (?, ?, ?, ?, ?)'
-  ).bind(name, email, hashedPassword, salt, role || 'member').run();
+    'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)'
+  ).bind(name, email, password_hash, role || 'member').run();
 
   return c.json({ success: true });
 });
@@ -34,7 +35,8 @@ app.post('/login', async (c) => {
     'SELECT * FROM users WHERE name = ?'
   ).bind(name).first();
 
-  if (!user || hashPassword(password, user.salt) !== user.password) {
+  let [hashedPassword, salt] = user.password_hash.split(':');
+  if (!user || hashPassword(password, salt) !== hashedPassword) {
     return c.json({ error: 'Invalid credentials' }, 401);
   }
 
