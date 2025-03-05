@@ -31,9 +31,14 @@ app.post('/register', async (c) => {
 
 app.post('/login', async (c) => {
   const { email, password } = await c.req.json();
-  const user = await c.env.PUULDB.prepare(
-    'SELECT * FROM users WHERE email = ?'
-  ).bind(email).first();
+  let user;
+  try {
+    user = await c.env.PUULDB.prepare(
+      'SELECT * FROM users WHERE email = ?'
+    ).bind(email).first();
+  } catch (error) {
+    return c.json({ error: 'User not found' }, 401);
+  }
 
   let [hashedPassword, salt] = user.password_hash.split(':');
   if (!user || hashPassword(password, salt) !== hashedPassword) {
