@@ -37,6 +37,10 @@ app.post('/login', async (c) => {
       'SELECT * FROM users WHERE email = ?'
     ).bind(email).first();
   } catch (error) {
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+
+  if (!user) {
     return c.json({ error: 'User not found' }, 401);
   }
 
