@@ -18,7 +18,7 @@ app.post('/register', async (c) => {
   const { name, password, email, role } = await c.req.json();
   const salt = randomBytes(16).toString('hex');
   const hashedPassword = hashPassword(password, salt);
-  const password_hash = '${hashedPassword}:${salt}';
+  const password_hash = `${hashedPassword}:${salt}`;
 
   await c.env.PUULDB.prepare(
     'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)'
