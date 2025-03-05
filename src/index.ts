@@ -14,24 +14,25 @@ const hashPassword = (password, salt) => {
 };
 
 
-
 app.post('/register', async (c) => {
-  const { username, password, email, role } = await c.req.json();
+  const { name, password, email, role } = await c.req.json();
   const salt = randomBytes(16).toString('hex');
   const hashedPassword = hashPassword(password, salt);
 
   await c.env.PUULDB.prepare(
-    'INSERT INTO users (username, email, password, salt, role) VALUES (?, ?, ?, ?, ?)'
-  ).bind(username, email, hashedPassword, salt, role || 'member').run();
+    'INSERT INTO users (name, email, password, salt, role) VALUES (?, ?, ?, ?, ?)'
+  ).bind(name, email, hashedPassword, salt, role || 'member').run();
 
   return c.json({ success: true });
 });
 
+//example: curl -X POST -H "Content-Type: application/json" -d '{"name":"admin", "password":"admin", "email":"example@example.com", "role":"admin"}' https://puul.dev
+
 app.post('/login', async (c) => {
-  const { username, password } = await c.req.json();
+  const { name, password } = await c.req.json();
   const user = await c.env.PUULDB.prepare(
-    'SELECT * FROM users WHERE username = ?'
-  ).bind(username).first();
+    'SELECT * FROM users WHERE name = ?'
+  ).bind(name).first();
 
   if (!user || hashPassword(password, user.salt) !== user.password) {
     return c.json({ error: 'Invalid credentials' }, 401);
