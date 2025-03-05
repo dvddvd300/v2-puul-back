@@ -56,7 +56,6 @@ app.post('/login', async (c) => {
 });
 
 
-
 app.use(async (c, next) => {
   const sessionKey = c.req.header('Authorization');
   if (!sessionKey) return c.json({ error: 'Unauthorized' }, 401);
@@ -65,6 +64,12 @@ app.use(async (c, next) => {
   c.set('userId', userId);
   await next();
 });
+
+app.get('/me', async (c) => {
+  const userId = c.get('userId');
+  const user = await c.env.PUULDB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  return c.json(user);
+} );
 
 
 
