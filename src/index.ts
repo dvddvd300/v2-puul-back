@@ -30,10 +30,10 @@ app.post('/register', async (c) => {
 //example: curl -X POST -H "Content-Type: application/json" -d '{"name":"admin", "password":"admin", "email":"example@example.com", "role":"admin"}' https://puul.dev
 
 app.post('/login', async (c) => {
-  const { name, password } = await c.req.json();
+  const { email, password } = await c.req.json();
   const user = await c.env.PUULDB.prepare(
-    'SELECT * FROM users WHERE name = ?'
-  ).bind(name).first();
+    'SELECT * FROM users WHERE email = ?'
+  ).bind(email).first();
 
   let [hashedPassword, salt] = user.password_hash.split(':');
   if (!user || hashPassword(password, salt) !== hashedPassword) {
@@ -58,14 +58,6 @@ app.use(async (c, next) => {
 });
 
 
-
-app.post('/users', async (c) => {
-  const { name, email, role } = await c.req.json();
-  await c.env.PUULDB.prepare('INSERT INTO users (name, email, role) VALUES (?, ?, ?)')
-    .bind(name, email, role || 'member')
-    .run();
-  return c.json({ success: true });
-});
 
 app.get('/users', async (c) => {
   const { name, email, role } = c.req.query();
