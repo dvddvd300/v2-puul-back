@@ -14,7 +14,10 @@
 		"enabled": true
   },
   "kv_namespaces": [
-    { "binding": "puul-ses", "id": "23bb46c36f224b2194c9f055716cc71c" }
+    { "binding": "KVSESS", "id": "23bb46c36f224b2194c9f055716cc71c" }
+  ],
+  "d1_databases": [
+    { "binding": "PUULDB", "database_id": "f9fbb2f9-2a95-458d-8a38-302bcf1dec3d" }
   ]
   /**
    * Smart Placement

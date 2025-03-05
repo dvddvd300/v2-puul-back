@@ -2,19 +2,25 @@ import { Hono } from 'hono';
 import { handle } from 'hono/cloudflare-workers';
 import { createHash, randomBytes } from 'crypto';
 
+type Bindings = {
+  KVSESS: KVNamespace;
+  PUULDB: D1Database;
+};
+
 const app = new Hono();
 
-// Authentication helpers
 const hashPassword = (password, salt) => {
   return createHash('sha256').update(password + salt).digest('hex');
 };
+
+
 
 app.post('/register', async (c) => {
   const { username, password, email, role } = await c.req.json();
   const salt = randomBytes(16).toString('hex');
   const hashedPassword = hashPassword(password, salt);
 
-  await c.env.DB.prepare(
+  await c.env.PUULDB.prepare(
     'INSERT INTO users (username, email, password, salt, role) VALUES (?, ?, ?, ?, ?)'
   ).bind(username, email, hashedPassword, salt, role || 'member').run();
 
@@ -23,7 +29,7 @@ app.post('/register', async (c) => {
 
 app.post('/login', async (c) => {
   const { username, password } = await c.req.json();
-  const user = await c.env.DB.prepare(
+  const user = await c.env.PUULDB.prepare(
     'SELECT * FROM users WHERE username = ?'
   ).bind(username).first();
 
@@ -32,24 +38,27 @@ app.post('/login', async (c) => {
   }
 
   const sessionKey = randomBytes(32).toString('hex');
-  await c.env.KV.put(`session:${sessionKey}`, user.id, { expirationTtl: 86400 });
+  await c.env.KVSESS.put(`session:${sessionKey}`, user.id, { expirationTtl: 86400 });
 
   return c.json({ sessionKey });
 });
 
+
+
 app.use(async (c, next) => {
   const sessionKey = c.req.header('Authorization');
   if (!sessionKey) return c.json({ error: 'Unauthorized' }, 401);
-  const userId = await c.env.KV.get(`session:${sessionKey}`);
+  const userId = await c.env.KVSESS.get(`session:${sessionKey}`);
   if (!userId) return c.json({ error: 'Invalid session' }, 401);
   c.set('userId', userId);
   await next();
 });
 
-// User Endpoints
+
+
 app.post('/users', async (c) => {
   const { name, email, role } = await c.req.json();
-  await c.env.DB.prepare('INSERT INTO users (name, email, role) VALUES (?, ?, ?)')
+  await c.env.PUULDB.prepare('INSERT INTO users (name, email, role) VALUES (?, ?, ?)')
     .bind(name, email, role || 'member')
     .run();
   return c.json({ success: true });
@@ -74,14 +83,16 @@ app.get('/users', async (c) => {
   }
   if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
   query += ' GROUP BY users.id';
-  const users = await c.env.DB.prepare(query).bind(...bindings).all();
+  const users = await c.env.PUULDB.prepare(query).bind(...bindings).all();
   return c.json(users);
 });
 
+
+
 // Task Endpoints
 app.post('/tasks', async (c) => {
-  const { title, description, estimatedHours, dueDate, status, assignedUsers, cost } = await c.req.json();
-  await c.env.DB.prepare(
+  const { title, description, estimatedHours, dueDate, status, cost } = await c.req.json();
+  await c.env.PUULDB.prepare(
     'INSERT INTO tasks (title, description, estimated_hours, due_date, status, cost) VALUES (?, ?, ?, ?, ?, ?)'
   ).bind(title, description, estimatedHours, dueDate, status, cost).run();
   return c.json({ success: true });
@@ -110,13 +121,13 @@ app.get('/tasks', async (c) => {
   }
   if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
   query += ' ORDER BY due_date DESC';
-  const tasks = await c.env.DB.prepare(query).bind(...bindings).all();
+  const tasks = await c.env.PUULDB.prepare(query).bind(...bindings).all();
   return c.json(tasks);
 });
 
 app.put('/tasks/:id', async (c) => {
   const { title, description, estimatedHours, dueDate, status, assignedUsers, cost } = await c.req.json();
-  await c.env.DB.prepare(
+  await c.env.PUULDB.prepare(
     'UPDATE tasks SET title=?, description=?, estimated_hours=?, due_date=?, status=?, cost=? WHERE id=?'
   ).bind(title, description, estimatedHours, dueDate, status, cost, c.req.param('id')).run();
   return c.json({ success: true });
@@ -124,15 +135,15 @@ app.put('/tasks/:id', async (c) => {
 
 app.delete('/tasks/:id', async (c) => {
   const userId = c.get('userId');
-  const user = await c.env.DB.prepare('SELECT role FROM users WHERE id = ?').bind(userId).first();
+  const user = await c.env.PUULDB.prepare('SELECT role FROM users WHERE id = ?').bind(userId).first();
   if (user.role !== 'admin') return c.json({ error: 'Forbidden' }, 403);
-  await c.env.DB.prepare('DELETE FROM tasks WHERE id = ?').bind(c.req.param('id')).run();
+  await c.env.PUULDB.prepare('DELETE FROM tasks WHERE id = ?').bind(c.req.param('id')).run();
   return c.json({ success: true });
 });
 
 app.get('/analytics', async (c) => {
-  const totalTasks = await c.env.DB.prepare('SELECT COUNT(*) as count FROM tasks').first();
-  const completedTasks = await c.env.DB.prepare('SELECT COUNT(*) as count FROM tasks WHERE status = "completed"').first();
+  const totalTasks = await c.env.PUULDB.prepare('SELECT COUNT(*) as count FROM tasks').first();
+  const completedTasks = await c.env.PUULDB.prepare('SELECT COUNT(*) as count FROM tasks WHERE status = "completed"').first();
   return c.json({ totalTasks, completedTasks });
 });
 
