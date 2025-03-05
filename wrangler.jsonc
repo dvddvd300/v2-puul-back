@@ -4,7 +4,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "my-hono-app",
+	"name": "puul-api",
 	"main": "src/index.ts",
   "compatibility_flags": [
     "nodejs_compat"
