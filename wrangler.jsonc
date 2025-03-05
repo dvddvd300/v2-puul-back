@@ -14,7 +14,7 @@
 		"enabled": true
   },
   "kv_namespaces": [
-    { "binding": "MY_KV_NAMESPACE", "id": "my-kv-namespace" }
+    { "binding": "puul-ses", "id": "23bb46c36f224b2194c9f055716cc71c" }
   ]
   /**
    * Smart Placement
