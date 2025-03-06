@@ -126,13 +126,7 @@ app.post('/tasks', async (c) => {
 app.get('/tasks', async (c) => {
   const { dueDate, name, assignedUser, email } = c.req.query();
   let query = `SELECT tasks.*, 
-                      json_group_array(
-                        CASE 
-                          WHEN users.id IS NOT NULL 
-                          THEN json_object('name', users.name, 'email', users.email) 
-                          ELSE NULL 
-                        END
-                      ) AS assignedUsersRaw 
+                      json_group_array(json_object('name', users.name, 'email', users.email)) AS assignedUsersRaw 
                FROM tasks 
                LEFT JOIN task_assignments ON tasks.id = task_assignments.task_id 
                LEFT JOIN users ON task_assignments.user_id = users.id`;
@@ -160,7 +154,9 @@ app.get('/tasks', async (c) => {
 
   tasks.results = tasks.results.map(task => ({
     ...task,
-    assignedUsers: JSON.parse(task.assignedUsersRaw || '[]')
+    assignedUsers: task.assignedUsersRaw ?
+      JSON.parse(task.assignedUsersRaw).filter(user => user.name !== null && user.email !== null)
+      : []
   }));
 
   tasks.forEach(task => {
