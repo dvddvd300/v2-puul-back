@@ -27,7 +27,6 @@ app.post('/register', async (c) => {
   return c.json({ success: true });
 });
 
-//example: curl -X POST -H "Content-Type: application/json" -d '{"name":"admin", "password":"admin", "email":"example@example.com", "role":"admin"}' https://puul.dev
 
 app.post('/login', async (c) => {
   const { email, password } = await c.req.json();
@@ -100,11 +99,28 @@ app.get('/users', async (c) => {
 
 // Task Endpoints
 app.post('/tasks', async (c) => {
-  const { title, description, estimatedHours, dueDate, status, cost } = await c.req.json();
-  await c.env.PUULDB.prepare(
-    'INSERT INTO tasks (title, description, estimated_hours, due_date, status, cost) VALUES (?, ?, ?, ?, ?, ?)'
-  ).bind(title, description, estimatedHours, dueDate, status, cost).run();
-  return c.json({ success: true });
+  const { title, description, estimatedHours, dueDate, status, cost, assignedUsers } = await c.req.json();
+  
+  const taskResult = await c.env.PUULDB.prepare(
+    'INSERT INTO tasks (title, description, estimated_hours, due_date, status, cost) VALUES (?, ?, ?, ?, ?, ?) RETURNING id'
+  ).bind(title, description, estimatedHours, dueDate, status, cost).first();
+  
+  if (!taskResult) return c.json({ error: 'Failed to create task' }, 500);
+  const taskId = taskResult.id;
+
+  if (assignedUsers && assignedUsers.length > 0) {
+    const users = await c.env.PUULDB.prepare(
+      `SELECT id FROM users WHERE email IN (${assignedUsers.map(() => '?').join(',')})`
+    ).bind(...assignedUsers).all();
+    
+    const userIds = users.results.map(user => user.id);
+    for (const userId of userIds) {
+      await c.env.PUULDB.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)')
+        .bind(taskId, userId).run();
+    }
+  }
+
+  return c.json({ success: true, taskId });
 });
 
 app.get('/tasks', async (c) => {
@@ -135,10 +151,27 @@ app.get('/tasks', async (c) => {
 });
 
 app.put('/tasks/:id', async (c) => {
-  const { title, description, estimatedHours, dueDate, status, assignedUsers, cost } = await c.req.json();
+  const { title, description, estimatedHours, dueDate, status, cost, assignedUsers } = await c.req.json();
+  const taskId = c.req.param('id');
+
   await c.env.PUULDB.prepare(
     'UPDATE tasks SET title=?, description=?, estimated_hours=?, due_date=?, status=?, cost=? WHERE id=?'
-  ).bind(title, description, estimatedHours, dueDate, status, cost, c.req.param('id')).run();
+  ).bind(title, description, estimatedHours, dueDate, status, cost, taskId).run();
+
+  if (assignedUsers) {
+    await c.env.PUULDB.prepare('DELETE FROM task_assignments WHERE task_id = ?').bind(taskId).run();
+    
+    const users = await c.env.PUULDB.prepare(
+      `SELECT id FROM users WHERE email IN (${assignedUsers.map(() => '?').join(',')})`
+    ).bind(...assignedUsers).all();
+    
+    const userIds = users.results.map(user => user.id);
+    for (const userId of userIds) {
+      await c.env.PUULDB.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)')
+        .bind(taskId, userId).run();
+    }
+  }
+
   return c.json({ success: true });
 });
 
