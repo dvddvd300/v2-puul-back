@@ -68,7 +68,7 @@ app.get('/me', async (c) => {
   const userId = c.get('userId');
   const user = await c.env.PUULDB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
   return c.json(user);
-} );
+});
 
 
 
@@ -100,11 +100,11 @@ app.get('/users', async (c) => {
 // Task Endpoints
 app.post('/tasks', async (c) => {
   const { title, description, estimatedHours, dueDate, status, cost, assignedUsers } = await c.req.json();
-  
+
   const taskResult = await c.env.PUULDB.prepare(
     'INSERT INTO tasks (title, description, estimated_hours, due_date, status, cost) VALUES (?, ?, ?, ?, ?, ?) RETURNING id'
   ).bind(title, description, estimatedHours, dueDate, status, cost).first();
-  
+
   if (!taskResult) return c.json({ error: 'Failed to create task' }, 500);
   const taskId = taskResult.id;
 
@@ -112,7 +112,7 @@ app.post('/tasks', async (c) => {
     const users = await c.env.PUULDB.prepare(
       `SELECT id FROM users WHERE email IN (${assignedUsers.map(() => '?').join(',')})`
     ).bind(...assignedUsers).all();
-    
+
     const userIds = users.results.map(user => user.id);
     for (const userId of userIds) {
       await c.env.PUULDB.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)')
@@ -126,7 +126,13 @@ app.post('/tasks', async (c) => {
 app.get('/tasks', async (c) => {
   const { dueDate, name, assignedUser, email } = c.req.query();
   let query = `SELECT tasks.*, 
-                      json_group_array(json_object('name', users.name, 'email', users.email)) AS assignedUsersRaw 
+                      json_group_array(
+                        CASE 
+                          WHEN users.id IS NOT NULL 
+                          THEN json_object('name', users.name, 'email', users.email) 
+                          ELSE NULL 
+                        END
+                      ) AS assignedUsersRaw 
                FROM tasks 
                LEFT JOIN task_assignments ON tasks.id = task_assignments.task_id 
                LEFT JOIN users ON task_assignments.user_id = users.id`;
@@ -154,9 +160,16 @@ app.get('/tasks', async (c) => {
 
   tasks.results = tasks.results.map(task => ({
     ...task,
-    assignedUsers: JSON.parse(task.assignedUsersRaw || '[]')
+    assignedUsers: task.assignedUsersRaw ?
+      JSON.parse(task.assignedUsersRaw).filter(user => user.name !== null && user.email !== null)
+      : []
   }));
-  
+
+  tasks.forEach(task => {
+    delete task.assignedUsersRaw;
+  }
+  );
+
   return c.json(tasks);
 });
 
@@ -170,11 +183,11 @@ app.put('/tasks/:id', async (c) => {
 
   if (assignedUsers) {
     await c.env.PUULDB.prepare('DELETE FROM task_assignments WHERE task_id = ?').bind(taskId).run();
-    
+
     const users = await c.env.PUULDB.prepare(
       `SELECT id FROM users WHERE email IN (${assignedUsers.map(() => '?').join(',')})`
     ).bind(...assignedUsers).all();
-    
+
     const userIds = users.results.map(user => user.id);
     for (const userId of userIds) {
       await c.env.PUULDB.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)')
