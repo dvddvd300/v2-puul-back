@@ -125,7 +125,11 @@ app.post('/tasks', async (c) => {
 
 app.get('/tasks', async (c) => {
   const { dueDate, name, assignedUser, email } = c.req.query();
-  let query = 'SELECT * FROM tasks';
+  let query = `SELECT tasks.*, 
+                      json_group_array(json_object('name', users.name, 'email', users.email)) AS assignedUsers 
+               FROM tasks 
+               LEFT JOIN task_assignments ON tasks.id = task_assignments.task_id 
+               LEFT JOIN users ON task_assignments.user_id = users.id`;
   let conditions = [];
   let bindings = [];
   if (dueDate) {
@@ -137,15 +141,15 @@ app.get('/tasks', async (c) => {
     bindings.push(`%${name}%`);
   }
   if (assignedUser) {
-    conditions.push('assigned_user = ?');
+    conditions.push('task_assignments.user_id = ?');
     bindings.push(assignedUser);
   }
   if (email) {
-    conditions.push('assigned_user IN (SELECT id FROM users WHERE email LIKE ?)');
+    conditions.push('users.email LIKE ?');
     bindings.push(`%${email}%`);
   }
   if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
-  query += ' ORDER BY due_date DESC';
+  query += ' GROUP BY tasks.id ORDER BY due_date DESC';
   const tasks = await c.env.PUULDB.prepare(query).bind(...bindings).all();
   return c.json(tasks);
 });
