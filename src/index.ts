@@ -152,17 +152,16 @@ app.get('/tasks', async (c) => {
   query += ' GROUP BY tasks.id ORDER BY due_date DESC';
   const tasks = await c.env.PUULDB.prepare(query).bind(...bindings).all();
 
-  tasks.results = tasks.results.map(task => ({
+  tasks.results = tasks.results.map((task: any) => ({
     ...task,
     assignedUsers: task.assignedUsersRaw ?
-      JSON.parse(task.assignedUsersRaw).filter(user => user.name !== null && user.email !== null)
+      JSON.parse(task.assignedUsersRaw).filter((user: any) => user.name !== null && user.email !== null)
       : []
   }));
 
-  tasks.forEach(task => {
+  tasks.results.forEach((task: any) => {
     delete task.assignedUsersRaw;
-  }
-  );
+  });
 
   return c.json(tasks);
 });
