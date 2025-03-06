@@ -124,7 +124,7 @@ app.post('/tasks', async (c) => {
 });
 
 app.get('/tasks', async (c) => {
-  const { dueDate, name, assignedUser, email } = c.req.query();
+  const { dueDate, name, assignedUser, email, status, unassigned } = c.req.query();
   let query = `SELECT tasks.*, 
                       json_group_array(json_object('name', users.name, 'email', users.email)) AS assignedUsersRaw 
                FROM tasks 
@@ -147,6 +147,13 @@ app.get('/tasks', async (c) => {
   if (email) {
     conditions.push('users.email LIKE ?');
     bindings.push(`%${email}%`);
+  }
+  if (status) {
+    conditions.push('status = ?');
+    bindings.push(status);
+  }
+  if (unassigned) {
+    conditions.push('tasks.id NOT IN (SELECT task_id FROM task_assignments)');
   }
   if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
   query += ' GROUP BY tasks.id ORDER BY due_date DESC';
