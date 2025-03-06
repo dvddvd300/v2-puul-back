@@ -160,9 +160,7 @@ app.get('/tasks', async (c) => {
 
   tasks.results = tasks.results.map(task => ({
     ...task,
-    assignedUsers: task.assignedUsersRaw ?
-      JSON.parse(task.assignedUsersRaw).filter(user => user.name !== null && user.email !== null)
-      : []
+    assignedUsers: JSON.parse(task.assignedUsersRaw || '[]')
   }));
 
   tasks.forEach(task => {
